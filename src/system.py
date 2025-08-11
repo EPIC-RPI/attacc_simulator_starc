@@ -43,6 +43,17 @@ class System:
         self.hetero_name = name
         if self.hetero_name == DeviceType.PIM:
             ramulator = Ramulator(modelinfos, "ramulator2", "ramulator.out")
+
+            # ---------- Our implementation ----------
+            # Add page wise operation parameter into remulator 
+            # 这些成员变量由 main.py 在创建 System 后动态添加
+            ramulator.page_wise         = getattr(self, "page_wise", True)
+            ramulator.kv_budget         = getattr(self, "kv_budget", 1024)
+            ramulator.page_size         = getattr(self, "page_size", 16)
+            ramulator.page_select_ratio = getattr(self, "page_select_ratio", 0.25)
+            ramulator.kv_budget_dict = getattr(self, "kv_budget_dict", {})
+            # ------------------------------------------------
+
             self.devices['Acc'] = PIM(config,
                                       self.scaling_factor,
                                       ramulator)
