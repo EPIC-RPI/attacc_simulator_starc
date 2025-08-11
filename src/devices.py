@@ -165,14 +165,14 @@ class xPU:
                 exec_time = (
                     0.000000447 *
                     (1555 * 1000 * 1000 * 1000 / self.peak_memory_bandwidth) *
-                    sum(off_data) + 8.29) / 1000 / 1000
+                    sum(off_data) + 8.29) / 1000 / 1000 / 8   # Our implement: Divide by 8
                 return exec_time, 0, 0, 0
 
             elif layer.type == LayerType.NORM:
                 exec_time = (
                     0.0000016 *
                     (1555 * 1000 * 1000 * 1000 / self.peak_memory_bandwidth) *
-                    sum(off_data) + 6.87) / 1000 / 1000
+                    sum(off_data) + 6.87) / 1000 / 1000 / 8   # Our implement: Divide by 8
                 return exec_time, 0, 0, 0
 
             else:
@@ -249,11 +249,11 @@ class xPU:
             traffic = m * n * numOp * dbyte
             interface_bw = self.max_interface_bandwidth / 2
             if layer.type == LayerType.X2G:
-                exec_time = traffic / interface_bw
+                exec_time = traffic / interface_bw / 8 # Our implement: Divide by 8
             else:
                 ## allreduce
                 exec_time = get_nvlink_time(
-                    traffic / self.num_xpu) * (self.num_xpu - 1)
+                    traffic / self.num_xpu) * (self.num_xpu - 1) / 8 # Our implement: Divide by 8
 
             # all reduce communication
             energy = self.num_xpu * traffic * self.energy_table['comm']
