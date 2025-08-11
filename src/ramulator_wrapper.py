@@ -14,7 +14,12 @@ class Ramulator:
                  ramulator_dir,
                  output_log='',
                  fast_mode=False,
-                 num_hbm=5):
+                 num_hbm=5,
+                 page_wise=False, # Our implementation: Page-wise attention parameters
+                 page_size=16,    # Our implementation: Page-wise attention parameters
+                 page_select_ratio=0.25,  # Our implementation: Page-wise attention parameters
+                 kv_budget=0  # Our implementation: Page-wise attention parameters
+                 ):
         self.df = pd.DataFrame()
         self.ramulator_dir = ramulator_dir
         self.output_log = output_log
@@ -25,6 +30,11 @@ class Ramulator:
         self.nhead = modelinfos['num_heads']
         self.dhead = modelinfos['dhead']
         self.fast_mode = fast_mode
+        # Our implementation: Page-wise attention parameters
+        self.page_wise = page_wise
+        self.page_size = page_size
+        self.page_select_ratio = page_select_ratio
+        self.kv_budget = kv_budget
 
     def make_yaml_file(self, yaml_file, file_name, power_constraint):
         trace_path = os.path.join(self.ramulator_dir, file_name + ".trace")
@@ -95,13 +105,40 @@ class Ramulator:
         pim_type_name = pim_type.name.lower(
         ) if not pim_type == PIMType.BA else "bank"
         trace_file = os.path.join(self.ramulator_dir, file_name + '.trace')
-
+        
+        ################################## Our implementation ############################################
+        # -------- 这里决定本步的 KV budget ----------
+        # 优先使用 kv_budget_dict 中针对 seq_len=l 的条目；没有则退化为 self.kv_budget（可能为 0）
+        kv_budget = getattr(self, "kv_budget_dict", {}).get(
+            l, getattr(self, "kv_budget", 0)
+        )
+        page_wise         = getattr(self, "page_wise", False)
+        page_size         = getattr(self, "page_size", 16)
+        page_select_ratio = getattr(self, "page_select_ratio", 0.25)
+        # ------------------------------------------------
         trace_exc = os.path.join(
-            self.ramulator_dir,
-            "trace_gen/gen_trace_attacc_{}.py".format(pim_type_name))
-        trace_args = "--dhead {} --nhead {} --seqlen {} --dbyte {} --output {}".format(
-            self.dhead, num_ops_per_hbm, l, dbyte, trace_file)
+            self.ramulator_dir, f"trace_gen/gen_trace_attacc_{pim_type_name}.py"
+        )
 
+        trace_args = (
+            f"--dhead {self.dhead} --nhead {num_ops_per_hbm} "
+            f"--seqlen {l} --dbyte {dbyte} --output {trace_file}"
+        )
+
+        # page-wise / token-wise 参数拼接
+        if page_wise:
+            trace_args += " --page_wise"
+            if kv_budget > 0:          # 固定 KV 数
+                trace_args += f" --kv_budget {kv_budget}"
+            else:                      # 按比例
+                trace_args += f" --page_select_ratio {page_select_ratio}"
+            if page_size != 16:
+                trace_args += f" --page_size {page_size}"
+        else:
+            # 非 page-wise（token-wise）直接传 kv_budget（>0 时）
+            if kv_budget > 0:
+                trace_args += f" --kv_budget {kv_budget}"
+        ##########################################################################
         gen_trace_cmd = f"python {trace_exc} {trace_args}"
 
         # generate trace
@@ -157,6 +194,8 @@ class Ramulator:
     def run(self, pim_type: PIMType, layer: Layer, power_constraint=True):
         if os.path.exists(self.ramulator_dir):
             l = layer.n
+            kv_budget = self.kv_budget_dict.get(l, self.kv_budget) # Our implementation: add kv budget 
+
             dhead = self.dhead
             dbyte = layer.dbyte
             num_ops_per_attacc = layer.numOp
@@ -167,8 +206,11 @@ class Ramulator:
                 num_ops_group = math.ceil(num_ops_per_hbm / minimum_heads)
                 num_ops_per_hbm = minimum_heads
 
-            file_name = "attacc_l{}_nattn{}_dhead{}_dbyte{}_pc{}".format(
-                l, num_ops_per_hbm, dhead, layer.dbyte, int(power_constraint))
+            # Our implementation: Change File name
+            file_name = f"attacc_l{l}_kv{kv_budget}_nattn{num_ops_per_hbm}" \
+                        f"_dhead{dhead}_dbyte{dbyte}_pc{int(power_constraint)}"
+            
+
             yaml_file = os.path.join(self.ramulator_dir, file_name + '.yaml')
             self.make_yaml_file(yaml_file, file_name, power_constraint)
 
