@@ -6,7 +6,7 @@ from src.type import *
 from src.config import *
 from src.ramulator_wrapper import *
 
-RAMULATOR = False
+RAMULATOR = True
 
 
 def write_csv(logfile, perfs):
