@@ -611,7 +611,7 @@ def Attention(L, key_addr, val_addr, itr, valid_channel = n_channel,
       hex_addr = hex(addr)[2:]
       cmd_sfm[itr].append("PIM_SFM 0x{0:0>8}".format(hex_addr))
   
-  if False:
+  if add_cluster:
     cluster_norm_squre(norm_addr, L, cluster_width)
     cluater_norm_divide(norm_addr, L, cluster_width)
     cluster_similar(norm_addr, L, cluster_width)
