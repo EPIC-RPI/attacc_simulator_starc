@@ -165,14 +165,14 @@ class xPU:
                 exec_time = (
                     0.000000447 *
                     (1555 * 1000 * 1000 * 1000 / self.peak_memory_bandwidth) *
-                    sum(off_data) + 8.29) / 1000 / 1000 / 8   # Our implement: Divide by 8
+                    sum(off_data) + 8.29) / 1000 / 1000 / 8   # Our implement: 8 devices in parallel
                 return exec_time, 0, 0, 0
 
             elif layer.type == LayerType.NORM:
                 exec_time = (
                     0.0000016 *
                     (1555 * 1000 * 1000 * 1000 / self.peak_memory_bandwidth) *
-                    sum(off_data) + 6.87) / 1000 / 1000 / 8   # Our implement: Divide by 8
+                    sum(off_data) + 6.87) / 1000 / 1000 / 8   # Our implement: 8 devices in parallel
                 return exec_time, 0, 0, 0
 
             else:
@@ -323,7 +323,7 @@ class PIM:
 
         return [e_off, 0, 0, 0, e_flop, 0]
 
-    def get_time_and_energy(self, layer: Layer):
+    def get_time_and_energy(self, layer: Layer, l_target=0):
         if layer.type == LayerType.X2G:
             return self._io_time_energy(layer)
 
@@ -332,7 +332,10 @@ class PIM:
             if 'score' in layer.name:
                 m, n, k, numOp, dbyte = layer.get_infos()
                 time, traffic = self.ramulator.output(
-                    self.pim_type, layer, self.power_constraint)
+                    self.pim_type, layer, self.power_constraint, l_target=l_target)
+                print("=========================")
+                print(time)
+                print(traffic)
                 io_energy = 0
                 for i in range(len(self.io_energy_table)):
                     io_energy += traffic[i] * self.io_energy_table[i]
@@ -344,7 +347,9 @@ class PIM:
 
                 energies = [dram_energy, 0, 0, 0, cal_energy, 0]
                 energies = [i * self.num_attacc for i in energies]
-
+                print("=========================")
+                print(time)
+                print(energies)
                 return time, energies
             else:
                 return 0, [0, 0, 0, 0, 0, 0]
