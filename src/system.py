@@ -60,7 +60,7 @@ class System:
 
         elif self.hetero_name == DeviceType.CPU:
             self.devices['Acc'] = xPU(DeviceType.CPU, config,
-                                      self.scaling_factor)
+                                      self.scaling_factor) 
 
     # Set all device to GPU
     def set_xpu(self, config):
@@ -256,7 +256,7 @@ class System:
                             LayerType.MATMUL, LayerType.SOFTMAX, LayerType.X2G
                     ]:
                         exec_time, energy = self.devices[
-                            'Acc'].get_time_and_energy(layer)
+                            'Acc'].get_time_and_energy(layer,l_target=lin+lout)
                     else:
                         exec_time, energy = self.devices[
                             'GPU'].get_time_and_energy(layer)
