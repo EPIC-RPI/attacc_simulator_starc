@@ -6,7 +6,7 @@ from src.config import *
 from src.model import *
 from src.type import *
 
-
+num_call_trace = 0
 class Ramulator:
 
     def __init__(self,
@@ -101,7 +101,7 @@ class Ramulator:
 
     #def run_ramulator(self):
     def run_ramulator(self, pim_type: PIMType, l, num_ops_per_hbm, dbyte,
-                      yaml_file, file_name):
+                      yaml_file, file_name, l_target=0):
         pim_type_name = pim_type.name.lower(
         ) if not pim_type == PIMType.BA else "bank"
         trace_file = os.path.join(self.ramulator_dir, file_name + '.trace')
@@ -119,12 +119,11 @@ class Ramulator:
         trace_exc = os.path.join(
             self.ramulator_dir, f"trace_gen/gen_trace_attacc_{pim_type_name}.py"
         )
-
+        #print("test point 2 hit")
         trace_args = (
             f"--dhead {self.dhead} --nhead {num_ops_per_hbm} "
             f"--seqlen {l} --dbyte {dbyte} --output {trace_file}"
         )
-
         # page-wise / token-wise 参数拼接
         if page_wise:
             trace_args += " --page_wise"
@@ -134,13 +133,15 @@ class Ramulator:
                 trace_args += f" --page_select_ratio {page_select_ratio}"
             if page_size != 16:
                 trace_args += f" --page_size {page_size}"
+            if l == l_target-1:
+                trace_args += " --add_cluster"
         else:
             # 非 page-wise（token-wise）直接传 kv_budget（>0 时）
             if kv_budget > 0:
                 trace_args += f" --kv_budget {kv_budget}"
         ##########################################################################
         gen_trace_cmd = f"python {trace_exc} {trace_args}"
-
+    
         # generate trace
         try:
             os.system(gen_trace_cmd)
@@ -191,7 +192,8 @@ class Ramulator:
         ]
         return out
 
-    def run(self, pim_type: PIMType, layer: Layer, power_constraint=True):
+    def run(self, pim_type: PIMType, layer: Layer, power_constraint=True, l_target=0):
+        #print("test point 3 hit")
         if os.path.exists(self.ramulator_dir):
             l = layer.n
             kv_budget = self.kv_budget_dict.get(l, self.kv_budget) # Our implementation: add kv budget 
@@ -215,7 +217,7 @@ class Ramulator:
             self.make_yaml_file(yaml_file, file_name, power_constraint)
 
             result = self.run_ramulator(pim_type, l, num_ops_per_hbm,
-                                        layer.dbyte, yaml_file, file_name)
+                                        layer.dbyte, yaml_file, file_name, l_target)
 
             # remove trace
             rm_yaml_cmd = f"rm {yaml_file}"
@@ -259,9 +261,10 @@ class Ramulator:
         else:
             assert 0, "Need to install ramulator"
 
-    def output(self, pim_type: PIMType, layer: Layer, power_constraint=True):
+    def output(self, pim_type: PIMType, layer: Layer, power_constraint=True, l_target=0):
+        #print("test point 4 hit")
         if self.df.empty:
-            self.run(pim_type, layer, power_constraint)
+            self.run(pim_type, layer, power_constraint, l_target=l_target)
 
         num_ops_per_attacc = layer.numOp
         num_ops_per_hbm = math.ceil(num_ops_per_attacc / self.num_hbm)
@@ -279,7 +282,7 @@ class Ramulator:
                       (self.df['power_constraint'] == power_constraint) &  \
                       (self.df['pim_type'] == pim_type.name)]
         if row.empty:
-            return self.run(pim_type, layer, power_constraint)
+            return self.run(pim_type, layer, power_constraint, l_target=l_target)
 
         else:
             cycle = int(row.iloc[0]['cycle'])
@@ -308,4 +311,6 @@ class Ramulator:
             traffic = [i * num_ops_group for i in traffic]
             exec_time = self.tCK * cycle / 1000 / 1000 / 1000  # ns -> s
             exec_time *= num_ops_group
+            #print(traffic)
+            #print(exec_time)
             return exec_time, traffic
